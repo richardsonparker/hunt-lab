@@ -1,6 +1,7 @@
-# Splunk Threat Hunt — Walkthrough
+# Splunk Threat Hunt - Walkthrough
 
-Brightfield Partners (`brightfield.local`), 9 hosts, 2026-08-13 → 2026-08-19. One workstation gets phished, the attacker beacons out over PowerShell, plants persistence, steals an admin credential, moves to the file server over SMB, and exfiltrates 58 MB of finance and PII data. Every SPL query below is the actual query I ran, in the order I ran it, against `index=hunt_lab`.
+Brightfield Partners (`brightfield.local`), 9 hosts, 2026-08-13 -> 2026-08-19. 
+Every SPL query below is the actual query I ran, in the order I ran it, against `index=hunt_lab`.
 
 **Org:** Brightfield Partners · domain `brightfield.local`
 **Window:** 7 days, 2026-08-13 → 2026-08-19 (Asia/Jerusalem). Incident lands on day 4–5.
@@ -107,11 +108,11 @@ index=hunt_lab sourcetype=sysmon:json host=wks01 EventCode IN (11,13,22)
 C:\Users\yhar-even\AppData\Local\Microsoft\Windows\INetCache\Content.Outlook\812F1951\Vendor_Statement_Update.docm
 ```
 
-A `.docm` carries embedded VBA — unlike `.docx` it can run code. `yhar-even` opened a macro doc from email.
+A `.docm` carries embedded VBA - unlike `.docx` it can run code. `yhar-even` opened a macro doc from email.
 
-> **T1566.001** — Phishing: Spearphishing Attachment
+> **T1566.001** - Phishing: Spearphishing Attachment
 
-**11:02:26 — DNS resolution.** (EventCode 22) `powershell.exe` resolves `static-assets-cache.net` → **203.0.113.133**. The name reads like a benign CDN cache; the IP sits in TEST-NET-3, the documentation range this lab uses for external infrastructure.
+**11:02:26 - DNS resolution.** (EventCode 22) `powershell.exe` resolves `static-assets-cache.net` → **203.0.113.133**. The name reads like a benign CDN cache; the IP sits in TEST-NET-3, the documentation range this lab uses for external infrastructure.
 
 ## **14:17:13 — persistence.** (EventCode 13) Registry value set:
 
@@ -120,10 +121,10 @@ HKU\yhar-even\Software\Microsoft\Windows\CurrentVersion\Run\WindowsUpdateHelper
   → C:\Users\yhar-even\AppData\Roaming\Microsoft\Windows\WindowsUpdateHelper.exe
 ```
 
-A Run key means it fires on every logon. Microsoft never ships core update binaries into a user's `AppData\Roaming` — real update files live in `System32` or `Windows\Servicing`. AppData is a classic malware default because it needs no admin rights.
+A Run key means it fires on every logon. Microsoft never ships core update binaries into a user's `AppData\Roaming` - real update files live in `System32` or `Windows\Servicing`. AppData is a classic malware default because it needs no admin rights.
 
-> **T1547.001** — Boot or Logon Autostart Execution: Registry Run Keys
-> **T1036.005** — Masquerading: Match Legitimate Resource Name or Location
+> **T1547.001** - Boot or Logon Autostart Execution: Registry Run Keys
+> **T1036.005** - Masquerading: Match Legitimate Resource Name or Location
 
 **The pivot key: PID 13316, ProcessGuid `{fc14a32e-6a82c004-00000005}`.** The DNS query at 11:02:26 and the persistence write at 14:17:13 carry the same GUID — one process, alive **3h15m**. Close PowerShell and reopen it, you get a new GUID, so this one is a continuous session.
 
@@ -275,13 +276,14 @@ index=hunt_lab sourcetype=sysmon:json host=fs01 EventCode=3 DestinationIp=203.0.
 ```
 One network event on FS01, at    UtcTime: 2026-08-17 12:02:01.000 . Consistent.
 
-**summary so far:**
+***summary so far:***
+
 Splitting the traffic towards "203.0.113.133" returned two internal hosts, and only one of them had a delivery story. WKS01 had the attachment, the cradle, and three hours of beaconing. 
 FS01 had a connection to the same infrastructure and nothing explaining it - no suspicious Office activity, no second phishing attempt, and no inbound session that could have reached it directly. 
 A second host talking to the same C2 with no independent entry point means the operator probably moved to it from inside, and moving to a Windows file server means authenticating to it. 
 That authentication has to be recorded on FS01 as a logon event, so I went looking for one from 10.42.20.85 in the window between WKS01 going quiet and FS01 going loud. 
-The rare admin account adm-mrogers — 2 events out of 131K+ events in Sysmon, both on FS01 — told me which account to expect before I ran the query.
----
+The rare admin account adm-mrogers — 2 events out of 131K+ events in Sysmon, both on FS01 - told me which account to expect before I ran the query. 
+
 
 ## Stage 3.1 — What logon reached FS01?.
 
@@ -745,5 +747,7 @@ index=hunt_lab sourcetype=sysmon:json EventCode=11
 
 Only one Outlook cache write in the whole dataset - one recipient, not a campaign.
 
+**what ae found:**
+A macro attachment on WKS01 launches an encoded PowerShell cradle that beacons for three hours, drops Run-key persistence, and runs interactive discovery — all at medium integrity, as a standard user. The operator then authenticates to FS01 as adm-mrogers over NTLM, accesses ADMIN$ to install a service for execution, stages 14 finance and PII files with Robocopy, and exfiltrates a 58 MB archive to the same C2 over 443.
 
-
+***Unresolved:*** how adm-mrogers's credential was obtained. It happened inside a nine-minute window with no process telemetry, which is where I'd look first with EDR or LSASS access logging.
