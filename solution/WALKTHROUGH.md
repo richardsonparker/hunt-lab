@@ -1,4 +1,4 @@
-# Splunk Threat Hunt - Walkthrough
+# Splunk Threat Hunt - Walkthrough - Brightfield Chaos
 
 Brightfield Partners (`brightfield.local`), 9 hosts, 2026-08-13 -> 2026-08-19. 
 Every SPL query below is the actual query I ran, in the order I ran it, against `index=hunt_lab`.
@@ -30,10 +30,10 @@ index=hunt_lab | stats count by sourcetype
 
 ## What each source is actually good for:
 
-- **fortigate** — Fortinet NGFW perimeter traffic. Volume, direction, destination.
-- **sysmon:json** — process execution, network connections, file writes, registry changes, DNS. Only useful read as chains and timelines, not single events.
-- **wineventlog:security:json** — logons and process-creation audit.
-- **wineventlog:system:json** — services, drivers, hardware, start/stop.
+- **fortigate** - Fortinet NGFW perimeter traffic. Volume, direction, destination.
+- **sysmon:json** - process execution, network connections, file writes, registry changes, DNS. Only useful read as chains and timelines, not single events.
+- **wineventlog:security:json** - logons and process-creation audit.
+- **wineventlog:system:json** - services, drivers, hardware, start/stop.
 
 ### Asset discovery
 
