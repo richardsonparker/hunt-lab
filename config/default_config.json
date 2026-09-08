@@ -1,0 +1,15 @@
+{
+  "target_size": "400MB",
+  "days": 7,
+  "timezone": "Asia/Jerusalem",
+  "workstations": 6,
+  "hard_max_mb": 2048,
+  "license_warn_mb": 450,
+  "index_name": "hunt_lab",
+  "supported_timezones": [
+    "Asia/Jerusalem", "UTC", "Europe/London", "Europe/Berlin",
+    "America/New_York", "America/Los_Angeles", "Asia/Kolkata",
+    "Asia/Tokyo", "Australia/Sydney"
+  ],
+  "note": "All CLI flags override these defaults. See generate.py --help."
+}

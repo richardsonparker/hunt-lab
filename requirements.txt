@@ -1,0 +1,2 @@
+# Standard library only. No third-party packages are required to run
+# generate.py or any module under scenario/, generators/, or validation/.

@@ -1,0 +1,608 @@
+{
+  "scenario_template": "phishing_macro_lateral_smb",
+  "scenario_name": "Phishing Attachment to SMB Lateral Movement",
+  "scenario_summary": "A user opens a malicious Office attachment delivered by email. A macro launches PowerShell, which establishes registry run-key persistence, performs local/domain discovery, and reuses a captured account to move laterally to the file server over SMB, where data is staged and archived before a small exfiltration burst to an external host.",
+  "seed": 93743820,
+  "time_window": {
+    "start": "2026-08-13T00:00:00.000+03:00",
+    "end": "2026-08-19T23:59:59.999+03:00",
+    "timezone": "Asia/Jerusalem"
+  },
+  "attack_start_time": "2026-08-17T11:00:54.000+03:00",
+  "attack_end_time": "2026-08-17T15:03:01.000+03:00",
+  "organization": "Brightfield Partners",
+  "domain": "brightfield.local",
+  "network_map": [
+    {
+      "hostname": "FGT-EDGE01",
+      "fqdn": null,
+      "ip": "10.42.1.176",
+      "role": "firewall",
+      "os": "FortiOS 7.4",
+      "primary_user": null
+    },
+    {
+      "hostname": "DC01",
+      "fqdn": "DC01.brightfield.local",
+      "ip": "10.42.5.200",
+      "role": "domain_controller",
+      "os": "Windows Server 2022",
+      "primary_user": null
+    },
+    {
+      "hostname": "FS01",
+      "fqdn": "FS01.brightfield.local",
+      "ip": "10.42.5.132",
+      "role": "file_server",
+      "os": "Windows Server 2022",
+      "primary_user": null
+    },
+    {
+      "hostname": "WKS01",
+      "fqdn": "WKS01.brightfield.local",
+      "ip": "10.42.20.85",
+      "role": "workstation",
+      "os": "Windows 10 22H2",
+      "primary_user": "yhar-even"
+    },
+    {
+      "hostname": "WKS02",
+      "fqdn": "WKS02.brightfield.local",
+      "ip": "10.42.20.225",
+      "role": "workstation",
+      "os": "Windows 11 23H2",
+      "primary_user": "nmizrahi"
+    },
+    {
+      "hostname": "WKS03",
+      "fqdn": "WKS03.brightfield.local",
+      "ip": "10.42.20.33",
+      "role": "workstation",
+      "os": "Windows 11 23H2",
+      "primary_user": "nsasson"
+    },
+    {
+      "hostname": "WKS04",
+      "fqdn": "WKS04.brightfield.local",
+      "ip": "10.42.20.170",
+      "role": "workstation",
+      "os": "Windows 11 23H2",
+      "primary_user": "mazoulay"
+    },
+    {
+      "hostname": "WKS05",
+      "fqdn": "WKS05.brightfield.local",
+      "ip": "10.42.20.117",
+      "role": "workstation",
+      "os": "Windows 10 22H2",
+      "primary_user": "oshapiro"
+    },
+    {
+      "hostname": "WKS06",
+      "fqdn": "WKS06.brightfield.local",
+      "ip": "10.42.20.176",
+      "role": "workstation",
+      "os": "Windows 11 23H2",
+      "primary_user": "sfriedman"
+    }
+  ],
+  "affected_hosts": [
+    "WKS01",
+    "FS01"
+  ],
+  "affected_accounts": [
+    "yhar-even",
+    "adm-mrogers"
+  ],
+  "attacker_infrastructure": {
+    "ip": "203.0.113.133",
+    "domain": "static-assets-cache.net",
+    "protocol": "https",
+    "port": 443
+  },
+  "initial_access_host": "WKS01",
+  "initial_access_user": "yhar-even",
+  "attack_timeline": [
+    {
+      "stage": "initial_access",
+      "technique": {
+        "id": "T1566.001",
+        "name": "Phishing: Spearphishing Attachment",
+        "url": "https://attack.mitre.org/techniques/T1566/001/"
+      },
+      "time": "2026-08-17T11:00:54.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "yhar-even receives and saves an email attachment (Vendor_Statement_Update.docm) to the Outlook secure temp cache.",
+      "pivot": "attachment path -> WINWORD.EXE child process",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 11,
+        "TargetFilename": "C:\\Users\\yhar-even\\AppData\\Local\\Microsoft\\Windows\\INetCache\\Content.Outlook\\812F1951\\Vendor_Statement_Update.docm"
+      }
+    },
+    {
+      "stage": "execution",
+      "technique": {
+        "id": "T1204.002",
+        "name": "User Execution: Malicious File",
+        "url": "https://attack.mitre.org/techniques/T1204/002/"
+      },
+      "time": "2026-08-17T11:01:36.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "Vendor_Statement_Update.docm opens the attachment; Word renders it with macros enabled.",
+      "pivot": "WINWORD.EXE ProcessGuid -> child powershell.exe",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "Image": "WINWORD.EXE"
+      }
+    },
+    {
+      "stage": "execution",
+      "technique": {
+        "id": "T1059.005",
+        "name": "Command and Scripting Interpreter: Visual Basic",
+        "url": "https://attack.mitre.org/techniques/T1059/005/"
+      },
+      "time": "2026-08-17T11:02:12.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "The macro (VBA, not independently logged) invokes powershell.exe as its child process.",
+      "pivot": "powershell.exe ProcessGuid",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "ParentImage": "WINWORD.EXE",
+        "Image": "powershell.exe"
+      }
+    },
+    {
+      "stage": "execution",
+      "technique": {
+        "id": "T1059.001",
+        "name": "Command and Scripting Interpreter: PowerShell",
+        "url": "https://attack.mitre.org/techniques/T1059/001/"
+      },
+      "time": "2026-08-17T11:02:12.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "Decoded script block shows a download-and-execute against static-assets-cache.net.",
+      "pivot": "ScriptBlockText domain -> DNS query -> network connection",
+      "evidence": {
+        "source": "powershell",
+        "EventCode": 4104,
+        "ScriptBlockId": "2e3a09d8-2565-3ae9-f84e-7c1073b36351"
+      }
+    },
+    {
+      "stage": "execution",
+      "technique": {
+        "id": "T1071.001",
+        "name": "Application Layer Protocol: Web Protocols",
+        "url": "https://attack.mitre.org/techniques/T1071/001/"
+      },
+      "time": "2026-08-17T14:14:45.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "powershell.exe repeatedly reconnects to static-assets-cache.net (203.0.113.133) over HTTPS -- 28 beacon-interval connections.",
+      "pivot": "count of connections to 203.0.113.133 over time -> beacon pattern",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 3,
+        "DestinationIp": "203.0.113.133"
+      }
+    },
+    {
+      "stage": "persistence",
+      "technique": {
+        "id": "T1547.001",
+        "name": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+        "url": "https://attack.mitre.org/techniques/T1547/001/"
+      },
+      "time": "2026-08-17T14:17:13.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "A Run-key value 'WindowsUpdateHelper' is created pointing at a dropped executable in AppData.",
+      "pivot": "TargetObject Run-key name -> reappears on every logon",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 13,
+        "TargetObject": "HKU\\yhar-even\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\WindowsUpdateHelper"
+      }
+    },
+    {
+      "stage": "discovery",
+      "technique": {
+        "id": "T1082",
+        "name": "System Information Discovery",
+        "url": "https://attack.mitre.org/techniques/T1082/"
+      },
+      "time": "2026-08-17T14:38:42.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "Local system, network config and process enumeration via cmd.exe/systeminfo/tasklist children of powershell.exe.",
+      "pivot": "children of the same ParentProcessGuid",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "ParentImage": "powershell.exe"
+      }
+    },
+    {
+      "stage": "discovery",
+      "technique": {
+        "id": "T1087.002",
+        "name": "Account Discovery: Domain Account",
+        "url": "https://attack.mitre.org/techniques/T1087/002/"
+      },
+      "time": "2026-08-17T14:38:42.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "'net user /domain' and 'net group \"Domain Admins\" /domain' enumerate domain accounts.",
+      "pivot": "TargetUserName candidates for lateral movement",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "CommandLine": "net.exe user /domain"
+      }
+    },
+    {
+      "stage": "discovery",
+      "technique": {
+        "id": "T1018",
+        "name": "Remote System Discovery",
+        "url": "https://attack.mitre.org/techniques/T1018/"
+      },
+      "time": "2026-08-17T14:38:42.000+03:00",
+      "host": "WKS01",
+      "account": "yhar-even",
+      "narrative": "'nltest /dclist' and 'net view \\\\FS01' enumerate reachable domain systems.",
+      "pivot": "FS01 identified as next-hop target",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "CommandLine": "net.exe view \\\\FS01"
+      }
+    },
+    {
+      "stage": "credential_use",
+      "technique": {
+        "id": "T1078.002",
+        "name": "Valid Accounts: Domain Accounts",
+        "url": "https://attack.mitre.org/techniques/T1078/002/"
+      },
+      "time": "2026-08-17T14:47:34.000+03:00",
+      "host": "WKS01",
+      "account": "adm-mrogers",
+      "narrative": "'net.exe use \\\\FS01\\ADMIN$ /user:BRIGHTFIELD\\adm-mrogers *' explicitly supplies a previously-harvested domain account (adm-mrogers) rather than the victim's own credentials.",
+      "pivot": "TargetUserName=adm-mrogers carries into the lateral-movement logon",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "CommandLine": "net.exe use"
+      }
+    },
+    {
+      "stage": "lateral_movement",
+      "technique": {
+        "id": "T1021.002",
+        "name": "Remote Services: SMB/Windows Admin Shares",
+        "url": "https://attack.mitre.org/techniques/T1021/002/"
+      },
+      "time": "2026-08-17T14:47:56.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "A Type 3 (network) logon for adm-mrogers lands on FS01 from WKS01 (10.42.20.85).",
+      "pivot": "TargetLogonId 0xf33c9c ties subsequent FS01 process activity to this session",
+      "evidence": {
+        "source": "windows_security",
+        "EventCode": 4624,
+        "LogonType": 3,
+        "IpAddress": "10.42.20.85"
+      }
+    },
+    {
+      "stage": "lateral_movement",
+      "technique": {
+        "id": "T1021.002",
+        "name": "Remote Services: SMB/Windows Admin Shares",
+        "url": "https://attack.mitre.org/techniques/T1021/002/"
+      },
+      "time": "2026-08-17T14:47:57.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "The same session immediately accesses the ADMIN$ administrative share on FS01 -- the delivery path for the payload dropped moments later.",
+      "pivot": "ShareName=\\\\FS01\\ADMIN$ confirms admin-share access, closing the delivery-path gap",
+      "evidence": {
+        "source": "windows_security",
+        "EventCode": 5140,
+        "ShareName": "\\\\FS01\\ADMIN$"
+      }
+    },
+    {
+      "stage": "lateral_movement",
+      "technique": {
+        "id": "T1021.002",
+        "name": "Remote Services: SMB/Windows Admin Shares",
+        "url": "https://attack.mitre.org/techniques/T1021/002/"
+      },
+      "time": "2026-08-17T14:48:07.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "A short-lived service ('WindowsUpdateSvc') is installed on FS01 to execute commands with SYSTEM-equivalent rights.",
+      "pivot": "ServiceName -> child cmd.exe on FS01",
+      "evidence": {
+        "source": "windows_system",
+        "EventCode": 7045,
+        "ServiceName": "WindowsUpdateSvc"
+      }
+    },
+    {
+      "stage": "collection",
+      "technique": {
+        "id": "T1005",
+        "name": "Data from Local System",
+        "url": "https://attack.mitre.org/techniques/T1005/"
+      },
+      "time": "2026-08-17T14:57:51.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "robocopy mirrors 14 files from \\\\FS01\\Finance$ into a Windows\\Temp staging directory.",
+      "pivot": "staged filenames -> archive TargetFilename",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 11,
+        "TargetFilename": "C:\\Windows\\Temp\\svc_stage\\..."
+      }
+    },
+    {
+      "stage": "staging",
+      "technique": {
+        "id": "T1074.001",
+        "name": "Data Staged: Local Data Staging",
+        "url": "https://attack.mitre.org/techniques/T1074/001/"
+      },
+      "time": "2026-08-17T14:57:51.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "Collected files sit under C:\\Windows\\Temp\\svc_stage pending archival.",
+      "pivot": "stage_dir -> archive name",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 11
+      }
+    },
+    {
+      "stage": "staging",
+      "technique": {
+        "id": "T1560.001",
+        "name": "Archive Collected Data: Archive via Utility",
+        "url": "https://attack.mitre.org/techniques/T1560/001/"
+      },
+      "time": "2026-08-17T14:57:51.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "Compress-Archive builds sys_diag.zip from the staged directory.",
+      "pivot": "archive filename -> outbound transfer size",
+      "evidence": {
+        "source": "sysmon",
+        "EventCode": 1,
+        "CommandLine": "Compress-Archive"
+      }
+    },
+    {
+      "stage": "exfiltration",
+      "technique": {
+        "id": "T1041",
+        "name": "Exfiltration Over C2 Channel",
+        "url": "https://attack.mitre.org/techniques/T1041/"
+      },
+      "time": "2026-08-17T15:02:01.000+03:00",
+      "host": "FS01",
+      "account": "adm-mrogers",
+      "narrative": "The archive is uploaded to 203.0.113.133 over the same HTTPS channel used for C2 -- a single large-sentbyte session (~61 MB).",
+      "pivot": "sentbyte outlier on FortiGate session to 203.0.113.133",
+      "evidence": {
+        "source": "fortigate",
+        "dstip": "203.0.113.133",
+        "sentbyte": 61077316
+      }
+    }
+  ],
+  "expected_telemetry": {
+    "sysmon": 66,
+    "windows_security": 21,
+    "powershell": 1,
+    "fortigate": 30,
+    "windows_system": 1
+  },
+  "generated_event_ids": {
+    "initial_workstation_process_guid": "{fc14a32e-6a82bfe0-00000003}",
+    "powershell_process_guid": "{fc14a32e-6a82c004-00000005}",
+    "powershell_logon_id": "0xa35548",
+    "lateral_movement_logon_id": "0xf33c9c",
+    "fs01_service_name": "WindowsUpdateSvc",
+    "staged_files": [
+      "Vendor_Contracts.pdf",
+      "Q2_Financials.xlsx",
+      "Customer_Export.csv",
+      "HR_Compensation_Bands.xlsx",
+      "Tax_Filing_2025.pdf",
+      "Client_PII_Export.csv",
+      "Bank_Wire_Instructions.docx",
+      "Audit_Findings_Internal.docx",
+      "AP_Ledger.xlsx",
+      "Board_Minutes_June.docx",
+      "M&A_NDA_Draft.docx",
+      "Insurance_Claims_Q2.xlsx",
+      "Payroll_Master_2026.xlsx",
+      "Budget_FY27_Draft.xlsx"
+    ],
+    "archive_name": "sys_diag.zip",
+    "stage_dir": "svc_stage"
+  },
+  "mitre_mappings": [
+    {
+      "id": "T1566.001",
+      "name": "Phishing: Spearphishing Attachment",
+      "url": "https://attack.mitre.org/techniques/T1566/001/",
+      "stage": "initial_access",
+      "evidence": "yhar-even receives and saves an email attachment (Vendor_Statement_Update.docm) to the Outlook secure temp cache."
+    },
+    {
+      "id": "T1204.002",
+      "name": "User Execution: Malicious File",
+      "url": "https://attack.mitre.org/techniques/T1204/002/",
+      "stage": "execution",
+      "evidence": "Vendor_Statement_Update.docm opens the attachment; Word renders it with macros enabled."
+    },
+    {
+      "id": "T1059.005",
+      "name": "Command and Scripting Interpreter: Visual Basic",
+      "url": "https://attack.mitre.org/techniques/T1059/005/",
+      "stage": "execution",
+      "evidence": "The macro (VBA, not independently logged) invokes powershell.exe as its child process."
+    },
+    {
+      "id": "T1059.001",
+      "name": "Command and Scripting Interpreter: PowerShell",
+      "url": "https://attack.mitre.org/techniques/T1059/001/",
+      "stage": "execution",
+      "evidence": "Decoded script block shows a download-and-execute against static-assets-cache.net."
+    },
+    {
+      "id": "T1071.001",
+      "name": "Application Layer Protocol: Web Protocols",
+      "url": "https://attack.mitre.org/techniques/T1071/001/",
+      "stage": "execution",
+      "evidence": "powershell.exe repeatedly reconnects to static-assets-cache.net (203.0.113.133) over HTTPS -- 28 beacon-interval connections."
+    },
+    {
+      "id": "T1547.001",
+      "name": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+      "url": "https://attack.mitre.org/techniques/T1547/001/",
+      "stage": "persistence",
+      "evidence": "A Run-key value 'WindowsUpdateHelper' is created pointing at a dropped executable in AppData."
+    },
+    {
+      "id": "T1082",
+      "name": "System Information Discovery",
+      "url": "https://attack.mitre.org/techniques/T1082/",
+      "stage": "discovery",
+      "evidence": "Local system, network config and process enumeration via cmd.exe/systeminfo/tasklist children of powershell.exe."
+    },
+    {
+      "id": "T1087.002",
+      "name": "Account Discovery: Domain Account",
+      "url": "https://attack.mitre.org/techniques/T1087/002/",
+      "stage": "discovery",
+      "evidence": "'net user /domain' and 'net group \"Domain Admins\" /domain' enumerate domain accounts."
+    },
+    {
+      "id": "T1018",
+      "name": "Remote System Discovery",
+      "url": "https://attack.mitre.org/techniques/T1018/",
+      "stage": "discovery",
+      "evidence": "'nltest /dclist' and 'net view \\\\FS01' enumerate reachable domain systems."
+    },
+    {
+      "id": "T1078.002",
+      "name": "Valid Accounts: Domain Accounts",
+      "url": "https://attack.mitre.org/techniques/T1078/002/",
+      "stage": "credential_use",
+      "evidence": "'net.exe use \\\\FS01\\ADMIN$ /user:BRIGHTFIELD\\adm-mrogers *' explicitly supplies a previously-harvested domain account (adm-mrogers) rather than the victim's own credentials."
+    },
+    {
+      "id": "T1021.002",
+      "name": "Remote Services: SMB/Windows Admin Shares",
+      "url": "https://attack.mitre.org/techniques/T1021/002/",
+      "stage": "lateral_movement",
+      "evidence": "A Type 3 (network) logon for adm-mrogers lands on FS01 from WKS01 (10.42.20.85)."
+    },
+    {
+      "id": "T1021.002",
+      "name": "Remote Services: SMB/Windows Admin Shares",
+      "url": "https://attack.mitre.org/techniques/T1021/002/",
+      "stage": "lateral_movement",
+      "evidence": "The same session immediately accesses the ADMIN$ administrative share on FS01 -- the delivery path for the payload dropped moments later."
+    },
+    {
+      "id": "T1021.002",
+      "name": "Remote Services: SMB/Windows Admin Shares",
+      "url": "https://attack.mitre.org/techniques/T1021/002/",
+      "stage": "lateral_movement",
+      "evidence": "A short-lived service ('WindowsUpdateSvc') is installed on FS01 to execute commands with SYSTEM-equivalent rights."
+    },
+    {
+      "id": "T1005",
+      "name": "Data from Local System",
+      "url": "https://attack.mitre.org/techniques/T1005/",
+      "stage": "collection",
+      "evidence": "robocopy mirrors 14 files from \\\\FS01\\Finance$ into a Windows\\Temp staging directory."
+    },
+    {
+      "id": "T1074.001",
+      "name": "Data Staged: Local Data Staging",
+      "url": "https://attack.mitre.org/techniques/T1074/001/",
+      "stage": "staging",
+      "evidence": "Collected files sit under C:\\Windows\\Temp\\svc_stage pending archival."
+    },
+    {
+      "id": "T1560.001",
+      "name": "Archive Collected Data: Archive via Utility",
+      "url": "https://attack.mitre.org/techniques/T1560/001/",
+      "stage": "staging",
+      "evidence": "Compress-Archive builds sys_diag.zip from the staged directory."
+    },
+    {
+      "id": "T1041",
+      "name": "Exfiltration Over C2 Channel",
+      "url": "https://attack.mitre.org/techniques/T1041/",
+      "stage": "exfiltration",
+      "evidence": "The archive is uploaded to 203.0.113.133 over the same HTTPS channel used for C2 -- a single large-sentbyte session (~61 MB)."
+    }
+  ],
+  "total_attack_events": 119,
+  "false_positives": [
+    {
+      "name": "After-hours bulk AD export by IT admin",
+      "spl": "index=hunt_lab sourcetype=powershell:json EventCode=4104 ScriptBlockText=\"*Export-Csv*\" host=dc01",
+      "why_benign": "Matches the documented quarterly AD-export script path (C:\\Scripts\\quarterly_export.ps1) and runs from adm-mrogers's account on the domain controller itself -- expected admin workflow, not attacker discovery."
+    },
+    {
+      "name": "Legitimate RDP admin session to FS01",
+      "spl": "index=hunt_lab sourcetype=wineventlog:security:json EventCode=4624 LogonType=10 dest=FS01",
+      "why_benign": "Source is an internal workstation IP (10.42.20.176) -- not the reserved 203.0.113.0/24 attacker-infra block -- with a short, single session and a matching 4634/4647 logoff shortly after."
+    },
+    {
+      "name": "Expired cached credential lockout (mazoulay)",
+      "spl": "index=hunt_lab sourcetype=wineventlog:security:json EventCode=4625 host=wks04 | stats count by TargetUserName",
+      "why_benign": "All 6 failures and the eventual success come from the user's own registered workstation (WKS04) with no external or lateral IP involved -- a stale cached password, not a brute force."
+    },
+    {
+      "name": "Adobe Acrobat updater installs a service",
+      "spl": "index=hunt_lab sourcetype=wineventlog:system:json EventCode=7045 | search ServiceName=\"AdobeARMservice\"",
+      "why_benign": "ImagePath points at Adobe's own signed update-service binary under Program Files, installed immediately after a user-initiated download in the same session -- routine patching, not attacker persistence."
+    },
+    {
+      "name": "Excel macro workbook spawns cmd.exe to archive a report",
+      "spl": "index=hunt_lab sourcetype=sysmon:json EventCode=1 ParentImage=\"*EXCEL.EXE\" Image=\"*cmd.exe\"",
+      "why_benign": "The known internal 'Monthly_Report_Macro.xlsm' workbook always spawns a single short-lived cmd.exe to copy its own output into an Archive folder -- consistent filename, consistent parent, no network activity, no persistence."
+    },
+    {
+      "name": "Off-hours outbound sync to contracted backup vendor",
+      "spl": "index=hunt_lab sourcetype=fortigate dstip=\"198.51.100.0/24\" app=\"backup-sync\" | stats sum(sentbyte) by dstip",
+      "why_benign": "Large, sustained overnight upload from FS01 to a single stable vendor IP with app='backup-sync' -- matches the nightly offsite backup window, not the short bursty pattern seen from the attacker-infra block (203.0.113.0/24)."
+    }
+  ],
+  "generation_timestamp": "2026-08-30 19:41:35",
+  "event_counts": {
+    "fortigate": 6980,
+    "sysmon": 2701,
+    "windows_security": 3604,
+    "windows_system": 2295,
+    "powershell": 1166
+  }
+}
