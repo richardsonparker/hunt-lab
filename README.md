@@ -1,6 +1,6 @@
 Generates synthetic endpoint and firewall telemetry with a hidden ATT&CK attack chain, plus Splunk ingest configs and a full hunt walkthrough.
 
-# Threat-Hunting Lab: Phishing
+# Threat-Hunting Lab: Brightfield Chaos - Phishing
 
 A reproducible threat-hunting lab. A MITRE ATT&CK-grounded attack chain is hidden
 inside realistic benign telemetry for a fictional organization (Brightfield
