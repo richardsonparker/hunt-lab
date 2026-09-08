@@ -78,7 +78,7 @@ attack step and reused everywhere a real forensic relationship would appear, so
 cross-source pivoting works the way it does in production instead of producing
 anomalies with nothing behind them.
 
-Four independent seeded RNG streams — environment, scenario, benign baseline,
+Four independent seeded RNG streams - environment, scenario, benign baseline,
 false positives- keep the organization, attack chain, and noise separately
 reproducible from a single `--seed`.
 
