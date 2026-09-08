@@ -39,7 +39,7 @@ you get the same story on the 7 days ending yesterday.
 investigation with every SPL query in the order it was actually run by me. 
 It documents the reasoning at each pivot, including corrections.
 
-***Spoilers throughout — read `docs/BRIEF.md` and hunt first.***
+***Spoilers throughout - read `docs/BRIEF.md` and hunt first.***
 
 ## Data sources
 
@@ -51,7 +51,7 @@ It documents the reasoning at each pivot, including corrections.
 | `wineventlog:system:json` | Windows service and system events |
 | `powershell:json` | PowerShell module and script-block logging |
 
-*** All five are required. ***
+***All five are required.***
 
 ## Repository structure
 
@@ -67,7 +67,7 @@ It documents the reasoning at each pivot, including corrections.
     └── ground_truth.json # Machine-readable scenario facts (regenerated every run)
 ```
 
-`dataset/` is gitignored — 300–500MB of generated telemetry, fully reproducible
+`dataset/` is gitignored - 300–500MB of generated telemetry, fully reproducible
 from the seed above.
 
 ## Design notes
