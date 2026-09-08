@@ -39,7 +39,7 @@ you get the same story on the 7 days ending yesterday.
 investigation with every SPL query in the order it was actually run by me. 
 It documents the reasoning at each pivot, including corrections.
 
-*** Spoilers throughout — read `docs/BRIEF.md` and hunt first. ***
+***Spoilers throughout — read `docs/BRIEF.md` and hunt first.***
 
 ## Data sources
 
